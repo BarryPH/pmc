@@ -38,7 +38,7 @@ def extractShortHand(search, string):
 	pos = re.search(r'(?i){}\d+'.format(search), string)
 
 	if pos != None:
-		number = string[pos.start() + 1:pos.end()]
+		number = string[pos.start() + len(search):pos.end()]
 		# Converting to int removes possible leading '0'
 		return int(number)
 
@@ -49,7 +49,8 @@ def extractSeasonNumber(string):
 
 def extractEpisodeNumber(string):
 	return extractLongHand('episode', string) \
-		or extractShortHand('E', string)
+		or extractShortHand('E', string) \
+		or extractShortHand('', string)
 
 def main():
 	directory = sys.argv[1] if len(sys.argv) >= 2 else '.'
