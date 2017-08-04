@@ -58,18 +58,28 @@ def main():
 		print('Folder or file "{}" does not exist'.format(directory))
 		sys.exit(0)
 
-	seriesFolders = getSubDirs(directory)
-
+	dir, subdirs, files = next(os.walk(directory))
+	seriesFolders = sorted(subdirs)
+	seriesFiles = sorted(files)
+	for file in seriesFiles:
+		cleanFileName = removeExcessDots(file)
+		episodeNumber = extractEpisodeNumber(cleanFileName)
+		seasonNumber = extractSeasonNumber(cleanFileName)
+		print(file,"->","S",seasonNumber,"E",episodeNumber)
+			
+	
 	for seriesFolder in seriesFolders:
 		seriesName = seriesFolder
+		print(seriesName)
 		seasonFolders = getSubDirs('{}/{}'.format(directory, seriesFolder))
 
 		if not len(seasonFolders):
 			continue
-
+		
 		for seasonFolder in seasonFolders:
 			cleanSeasonFolder = removeExcessDots(seasonFolder)
 			seasonNumber = extractSeasonNumber(cleanSeasonFolder)
+			print("\t",seasonFolder,"->",seasonNumber)
 			seasonNumber = None
 
 			dir, subdirs, files = next(os.walk('{}/{}/{}'.format(directory, seriesFolder, seasonFolder)))
@@ -78,6 +88,7 @@ def main():
 			for episode in episodeFiles:
 				cleanEpisodeName = removeExcessDots(episode)
 				episodeNumber = extractEpisodeNumber(cleanEpisodeName)
+				print("\t",episode,"->",episodeNumber)
 				episodeNumber = None
 
 parser = argparse.ArgumentParser(description='Clean up your media files names and structure')
