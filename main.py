@@ -4,6 +4,9 @@ import sys
 import argparse
 import os
 import re
+import json
+
+series = {}
 
 def padLeft(string, x):
 	return str(string).zfill(x)
@@ -56,6 +59,8 @@ def extractEpisodeNumber(string):
 		#or extractShortHand('', string)
 
 def findEpisodes(path):
+	episodes = []
+
 	dir, subdirs, files = next(os.walk(path))
 	files = sorted(files)
 
@@ -67,9 +72,16 @@ def findEpisodes(path):
 			continue
 
 		episodeNumber, _, _ = episodeNumberData
-		print('\t\t|- EP {}: {}'.format(padLeft(episodeNumber, 2), cleanFolderName))
+		episodes.append({
+			'episode': episodeNumber,
+			'file': file,
+			'cleanName': cleanFolderName,
+		})
+
+	return episodes
 
 def findSeasons(path):
+	seasons = []
 	folders = getSubDirs(path)
 
 	for folder in folders:
@@ -80,10 +92,18 @@ def findSeasons(path):
 			continue
 
 		seasonNumber = seasonNumberData[0]
-		print('\t|- Season {}:'.format(padLeft(seasonNumber, 2)))
-		findEpisodes('{}/{}'.format(path, folder))
+		episodes = findEpisodes('{}/{}'.format(path, folder))
+		seasons.append({
+			'season': seasonNumber,
+			'folder': folder,
+			'cleanName': cleanFolderName,
+			'episodes': episodes,
+		})
+
+	return seasons
 
 def findSeries(path):
+	series = []
 	folders = getSubDirs(path)
 
 	for folder in folders:
@@ -91,20 +111,35 @@ def findSeries(path):
 		seasonNumberData = extractSeasonNumber(cleanFolderName)
 		seasonPath = '{}/{}'.format(path, folder)
 
+		seriesData = {
+			'folder': folder,
+			'cleanName': cleanFolderName,
+		}
+
 		if seasonNumberData != None:
 			# Assume is folder of a season
 			seasonNumber, seasonNumberStartPos, _ = seasonNumberData
 			seriesName = cleanFolderName[:seasonNumberStartPos - 1]
-			print('{}:'.format(seriesName))
-			print('\t|- Season {}:'.format(padLeft(seasonNumber, 2)))
-			findEpisodes(seasonPath)
+			episodes = findEpisodes(seasonPath)
+
+			seriesData['seasons'] = [{
+				'season': seasonNumber,
+				'folder': folder,
+				'cleanName': cleanFolderName,
+				'episodes': episodes,
+			}]
+			series.append(seriesData)
 			continue
 
-		print('{}:'.format(cleanFolderName))
-		findSeasons(seasonPath)
+		seasons = findSeasons(seasonPath)
+		seriesData['seasons'] = seasons
+		series.append(seriesData)
+
+	return series
 
 def main():
-	findSeries(directory)
+	series = findSeries(directory)
+	print(json.dumps(series, indent=2))
 
 parser = argparse.ArgumentParser(description='Clean up your media files names and structure')
 parser.add_argument('root')
