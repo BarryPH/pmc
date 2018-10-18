@@ -6,27 +6,21 @@ import os
 import re
 import json
 
-series = {}
-
 def padLeft(string, x):
 	return str(string).zfill(x)
 
 def removeExcessDots(filename):
-	lastDotPos = filename.rfind('.')
-	base = filename[:lastDotPos]
-	extension = filename[lastDotPos:]
+	base, extension = os.path.splitext(filename)
+	dotlessBase = base.replace('.', ' ')
+	return dotlessBase + extension
 
-	if extension.find(' '):
-		base = base + extension
-		extension = ''
-
-	# Replace all instances of "." not followed by a space
-	base = re.sub(r'\.(?! )', ' ', base)
-	return base + extension
-
-def getSubDirs(directory):
-	dir, subdirs, files = next(os.walk(directory))
+def getSubDirs(path):
+	dir, subdirs, files = next(os.walk(path))
 	return sorted(subdirs)
+
+def getFiles(path):
+	dir, subdirs, files = next(os.walk(path))
+	return sorted(files)
 
 def extractLongHand(search, string):
 	pos = string.lower().find(search.lower())
@@ -49,33 +43,31 @@ def extractShortHand(search, string):
 		# Converting to int removes possible leading '0'
 		return int(number), pos.start(), pos.end()
 
-def extractSeasonNumber(string):
+def extractSeasonInfo(string):
 	return extractLongHand('season', string) \
 		or extractShortHand('S', string)
 
-def extractEpisodeNumber(string):
+def extractEpisodeInfo(string):
 	return extractLongHand('episode', string) \
 		or extractShortHand('E', string) #\
 		#or extractShortHand('', string)
 
 def findEpisodes(path):
 	episodes = []
-
-	dir, subdirs, files = next(os.walk(path))
-	files = sorted(files)
+	files = getFiles(path)
 
 	for file in files:
-		cleanFolderName = removeExcessDots(file)
-		episodeNumberData = extractEpisodeNumber(cleanFolderName)
+		cleanFileName = removeExcessDots(file)
+		episodeInfo = extractEpisodeInfo(cleanFileName)
 
-		if episodeNumberData == None:
+		if episodeInfo == None:
 			continue
 
-		episodeNumber, _, _ = episodeNumberData
+		episodeNumber, _, _ = episodeInfo
 		episodes.append({
-			'episode': episodeNumber,
-			'file': file,
-			'cleanName': cleanFolderName,
+			'number': episodeNumber,
+			'raw': file,
+			'clean': cleanFileName,
 		})
 
 	return episodes
@@ -86,17 +78,17 @@ def findSeasons(path):
 
 	for folder in folders:
 		cleanFolderName = removeExcessDots(folder)
-		seasonNumberData = extractSeasonNumber(cleanFolderName)
+		seasonInfo = extractSeasonInfo(cleanFolderName)
 
-		if seasonNumberData == None:
+		if seasonInfo == None:
 			continue
 
-		seasonNumber = seasonNumberData[0]
+		seasonNumber = seasonInfo[0]
 		episodes = findEpisodes('{}/{}'.format(path, folder))
 		seasons.append({
-			'season': seasonNumber,
-			'folder': folder,
-			'cleanName': cleanFolderName,
+			'number': seasonNumber,
+			'raw': folder,
+			'clean': cleanFolderName,
 			'episodes': episodes,
 		})
 
@@ -108,47 +100,49 @@ def findSeries(path):
 
 	for folder in folders:
 		cleanFolderName = removeExcessDots(folder)
-		seasonNumberData = extractSeasonNumber(cleanFolderName)
+		seasonInfo = extractSeasonInfo(cleanFolderName)
 		seasonPath = '{}/{}'.format(path, folder)
 
 		seriesData = {
-			'folder': folder,
-			'cleanName': cleanFolderName,
+			'raw': folder,
+			'clean': cleanFolderName,
 		}
 
-		if seasonNumberData != None:
+		if seasonInfo != None:
 			# Assume is folder of a season
-			seasonNumber, seasonNumberStartPos, _ = seasonNumberData
+			seasonNumber, seasonNumberStartPos, _ = seasonInfo
 			seriesName = cleanFolderName[:seasonNumberStartPos - 1]
 			episodes = findEpisodes(seasonPath)
 
 			seriesData['seasons'] = [{
-				'season': seasonNumber,
-				'folder': folder,
-				'cleanName': cleanFolderName,
+				'number': seasonNumber,
+				'raw': '',
+				'clean': cleanFolderName,
 				'episodes': episodes,
 			}]
 			series.append(seriesData)
 			continue
 
 		seasons = findSeasons(seasonPath)
-		seriesData['seasons'] = seasons
-		series.append(seriesData)
+
+		if len(seasons):
+			seriesData['seasons'] = seasons
+			series.append(seriesData)
 
 	return series
 
 def main():
-	series = findSeries(directory)
-	print(json.dumps(series, indent=2))
+	series = findSeries(rootPath)
+	#print(json.dumps(series, indent=2))
 
 parser = argparse.ArgumentParser(description='Clean up your media files names and structure')
 parser.add_argument('root')
 args = parser.parse_args()
 
-directory = sys.argv[1] if len(sys.argv) >= 2 else '.'
+rootPath = sys.argv[1] if len(sys.argv) >= 2 else '.'
 
-if not os.path.exists(directory):
-	print('Folder or file "{}" does not exist'.format(directory))
+if not os.path.exists(rootPath):
+	print('Folder or file "{}" does not exist'.format(rootPath))
 	sys.exit(0)
 
 main()
