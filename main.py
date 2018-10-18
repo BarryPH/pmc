@@ -5,10 +5,13 @@ import argparse
 import os
 import re
 
+def padLeft(string, x):
+	return str(string).zfill(x)
+
 def removeExcessDots(filename):
-	lastDotPosition = filename.rfind('.')
-	base = filename[:lastDotPosition]
-	extension = filename[lastDotPosition:]
+	lastDotPos = filename.rfind('.')
+	base = filename[:lastDotPos]
+	extension = filename[lastDotPos:]
 
 	if extension.find(' '):
 		base = base + extension
@@ -42,47 +45,61 @@ def extractShortHand(search, string):
 		# Converting to int removes possible leading '0'
 		return int(number)
 
-
 def extractSeasonNumber(string):
 	return extractLongHand('season', string) \
 		or extractShortHand('S', string)
 
 def extractEpisodeNumber(string):
 	return extractLongHand('episode', string) \
-		or extractShortHand('E', string) \
-		or extractShortHand('', string)
+		or extractShortHand('E', string) #\
+		#or extractShortHand('', string)
 
-def main():
-	directory = sys.argv[1] if len(sys.argv) >= 2 else '.'
+def findEpisodes(path):
+	dir, subdirs, files = next(os.walk(path))
+	files = sorted(files)
 
-	if not os.path.exists(directory):
-		print('Folder or file "{}" does not exist'.format(directory))
-		sys.exit(0)
+	for file in files:
+		episodeName = removeExcessDots(file)
+		episodeNumber = extractEpisodeNumber(episodeName)
 
-	seriesFolders = getSubDirs(directory)
-
-	for seriesFolder in seriesFolders:
-		seriesName = seriesFolder
-		seasonFolders = getSubDirs('{}/{}'.format(directory, seriesFolder))
-
-		if not len(seasonFolders):
+		if episodeNumber == None:
 			continue
 
-		for seasonFolder in seasonFolders:
-			cleanSeasonFolder = removeExcessDots(seasonFolder)
-			seasonNumber = extractSeasonNumber(cleanSeasonFolder)
-			seasonNumber = None
+def findSeasons(path):
+	folders = getSubDirs(path)
 
-			dir, subdirs, files = next(os.walk('{}/{}/{}'.format(directory, seriesFolder, seasonFolder)))
-			episodeFiles = sorted(files)
+	for folder in folders:
+		cleanFolderName = removeExcessDots(folder)
+		seasonNumber = extractSeasonNumber(cleanFolderName)
 
-			for episode in episodeFiles:
-				cleanEpisodeName = removeExcessDots(episode)
-				episodeNumber = extractEpisodeNumber(cleanEpisodeName)
-				episodeNumber = None
+		findEpisodes('{}/{}'.format(path, folder))
+
+def findSeries(path):
+	folders = getSubDirs(path)
+
+	for folder in folders:
+		cleanFolderName = removeExcessDots(folder)
+		seasonNumber = extractSeasonNumber(cleanFolderName)
+		seasonPath = '{}/{}'.format(path, folder)
+
+		if seasonNumber != None:
+			# Assume folder is for specific season
+			findEpisodes(seasonPath)
+			continue
+
+		findSeasons(seasonPath)
+
+def main():
+	findSeries(directory)
 
 parser = argparse.ArgumentParser(description='Clean up your media files names and structure')
 parser.add_argument('root')
 args = parser.parse_args()
+
+directory = sys.argv[1] if len(sys.argv) >= 2 else '.'
+
+if not os.path.exists(directory):
+	print('Folder or file "{}" does not exist'.format(directory))
+	sys.exit(0)
 
 main()
