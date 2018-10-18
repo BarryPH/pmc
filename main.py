@@ -35,7 +35,8 @@ def extractLongHand(search, string):
 		if numberEndPos == -1:
 			numberEndPos = len(string)
 
-		return string[numberStartPos:numberEndPos]
+		longhand = string[numberStartPos:numberEndPos]
+		return longhand, pos, numberEndPos
 
 def extractShortHand(search, string):
 	pos = re.search(r'(?i){}\d+'.format(search), string)
@@ -43,7 +44,7 @@ def extractShortHand(search, string):
 	if pos != None:
 		number = string[pos.start() + len(search):pos.end()]
 		# Converting to int removes possible leading '0'
-		return int(number)
+		return int(number), pos.start(), pos.end()
 
 def extractSeasonNumber(string):
 	return extractLongHand('season', string) \
@@ -59,19 +60,27 @@ def findEpisodes(path):
 	files = sorted(files)
 
 	for file in files:
-		episodeName = removeExcessDots(file)
-		episodeNumber = extractEpisodeNumber(episodeName)
+		cleanFolderName = removeExcessDots(file)
+		episodeNumberData = extractEpisodeNumber(cleanFolderName)
 
-		if episodeNumber == None:
+		if episodeNumberData == None:
 			continue
+
+		episodeNumber, _, _ = episodeNumberData
+		print('\t\t|- EP {}: {}'.format(padLeft(episodeNumber, 2), cleanFolderName))
 
 def findSeasons(path):
 	folders = getSubDirs(path)
 
 	for folder in folders:
 		cleanFolderName = removeExcessDots(folder)
-		seasonNumber = extractSeasonNumber(cleanFolderName)
+		seasonNumberData = extractSeasonNumber(cleanFolderName)
 
+		if seasonNumberData == None:
+			continue
+
+		seasonNumber = seasonNumberData[0]
+		print('\t|- Season {}:'.format(padLeft(seasonNumber, 2)))
 		findEpisodes('{}/{}'.format(path, folder))
 
 def findSeries(path):
@@ -79,14 +88,19 @@ def findSeries(path):
 
 	for folder in folders:
 		cleanFolderName = removeExcessDots(folder)
-		seasonNumber = extractSeasonNumber(cleanFolderName)
+		seasonNumberData = extractSeasonNumber(cleanFolderName)
 		seasonPath = '{}/{}'.format(path, folder)
 
-		if seasonNumber != None:
-			# Assume folder is for specific season
+		if seasonNumberData != None:
+			# Assume is folder of a season
+			seasonNumber, seasonNumberStartPos, _ = seasonNumberData
+			seriesName = cleanFolderName[:seasonNumberStartPos - 1]
+			print('{}:'.format(seriesName))
+			print('\t|- Season {}:'.format(padLeft(seasonNumber, 2)))
 			findEpisodes(seasonPath)
 			continue
 
+		print('{}:'.format(cleanFolderName))
 		findSeasons(seasonPath)
 
 def main():
